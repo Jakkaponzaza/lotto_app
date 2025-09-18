@@ -115,10 +115,19 @@ Future<void> main() async {
 
   // ตรวจสอบค่า API_BASE_URL
   final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? '';
+  print('API_BASE_URL from .env = $apiBaseUrl');
+  
   if (apiBaseUrl.isEmpty) {
     throw Exception('API_BASE_URL is not defined in .env');
   }
-  print('API_BASE_URL = $apiBaseUrl');
+  
+  // Log the URI parsing for debugging
+  try {
+    final uri = Uri.parse(apiBaseUrl);
+    print('Parsed URI - scheme: ${uri.scheme}, host: ${uri.host}, port: ${uri.port}');
+  } catch (e) {
+    print('Error parsing URI: $e');
+  }
 
   // สร้าง repository
   final LottoRepository repository = WebSocketLottoRepository();
@@ -126,10 +135,19 @@ Future<void> main() async {
   // 🔹 ทดสอบ WebSocket connection
   if (repository is WebSocketLottoRepository) {
     try {
+      print('DEBUG: Starting app initialization...');
+      print('DEBUG: Loading tickets...');
       await repository.connect();
       print('Connected: ${repository.isConnected}');
-    } catch (e) {
+      
+      // Add a small delay to allow connection to stabilize
+      await Future.delayed(const Duration(seconds: 2));
+      print('DEBUG: Connection status after delay: ${repository.isConnected}');
+    } catch (e, stackTrace) {
       print('WebSocket connection failed: $e');
+      print('Stack trace: $stackTrace');
+      // Don't throw the error, just log it and continue
+      print('Continuing app initialization despite connection error...');
     }
   }
 

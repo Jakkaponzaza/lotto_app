@@ -15,14 +15,44 @@ const PORT = process.env.PORT || 3000;
 const io = socketIo(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  // Add these options for better Render compatibility
+  transports: ['websocket'],
+  allowEIO3: true,
+  serveClient: false,
+  path: '/socket.io',
+  // Add ping settings for better connection management
+  pingInterval: 25000,
+  pingTimeout: 20000
+});
+
+// Add connection logging
+io.engine.on("connection_error", (err) => {
+  console.log('Socket.IO connection error:');
+  console.log(err.req);      // the request object
+  console.log(err.code);     // the error code, for example 1
+  console.log(err.message);  // the error message, for example "Session ID unknown"
+  console.log(err.context);  // some additional error context
 });
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Add a simple health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Add WebSocket upgrade handling logging
+server.on('upgrade', (req, socket, head) => {
+  console.log('🔄 WebSocket upgrade request received');
+  console.log('📡 Request URL:', req.url);
+  console.log('📋 Request headers:', req.headers);
+});
 
 // Database connection config
 const dbConfig = {
@@ -254,6 +284,20 @@ class UserSession {
 // WebSocket connection handling
 io.on('connection', (socket) => {
   console.log(`\n🔌 NEW CONNECTION: ${socket.id}`);
+  console.log(`📡 Remote address: ${socket.conn.remoteAddress}`);
+  console.log(`🛣️  Transport: ${socket.conn.transport.name}`);
+  
+  // Log the request headers for debugging
+  console.log(`📋 Request headers:`, socket.conn.request.headers);
+  
+  // Log the URL that was used to connect
+  console.log(`🔗 Connection URL: ${socket.conn.request.url}`);
+  
+  // Log the query parameters
+  console.log(`🔍 Query parameters:`, socket.handshake.query);
+  
+  // Add connection success log
+  console.log(`✅ CONNECTION ESTABLISHED SUCCESSFULLY`);
 
   // Create new user session
   const session = new UserSession(socket.id);
@@ -1087,11 +1131,14 @@ io.on('connection', (socket) => {
 require('dotenv').config(); // โหลดค่า .env (คุณมีแล้ว)
 
 // Use the PORT from environment for Render deployment
-// const PORT = process.env.PORT || 3000; (moved up)
+console.log(`Starting server on port ${PORT}`);
+
 server.listen(PORT, () => {
   console.log(`🚀 WebSocket Lotto Server running on port ${PORT}`);
   console.log(`🌐 WebSocket Server ready for connections`);
   console.log(`📊 Server Type: Stateful WebSocket with Real-time Updates`);
+  console.log(`🔧 Socket.IO Path: ${io.opts.path}`);
+  console.log(`🔧 Allowed transports: ${io.opts.transports}`);
 
   // Initialize database and create required tables
   initializeDatabase();

@@ -42,29 +42,101 @@ class WebSocketLottoRepository implements LottoRepository {
         const String.fromEnvironment(
             'API_BASE_URL', defaultValue: 'wss://flutter-lotto-backend.onrender.com');
 
-    // Remove any trailing slash and ensure correct WebSocket URL format for Render
+    // Remove any trailing slash and clean up the URL
     baseUrl = baseEnvUrl.replaceAll(RegExp(r'/$'), '');
+    
+    // Special handling for Render URLs to prevent port issues
+    if (baseUrl.contains('onrender.com')) {
+      try {
+        // Parse the URL using Dart's Uri class
+        final uri = Uri.parse(baseUrl);
+        
+        // For Render URLs, we must be very careful about port handling
+        // Reconstruct URL without any port specification to avoid :0 issue
+        if (uri.scheme == 'wss') {
+          baseUrl = 'wss://${uri.host}';
+        } else if (uri.scheme == 'ws') {
+          baseUrl = 'ws://${uri.host}';
+        } else {
+          // Fallback
+          baseUrl = 'wss://${uri.host}';
+        }
+        
+        print('DEBUG: Parsed URI - scheme: ${uri.scheme}, host: ${uri.host}, port: ${uri.port}');
+      } catch (e) {
+        print('DEBUG: Error parsing URI: $e');
+        // Manual parsing as fallback
+        if (baseUrl.startsWith('wss://')) {
+          String hostPart = baseUrl.substring(6);
+          // Remove everything after the first slash (path)
+          if (hostPart.contains('/')) {
+            hostPart = hostPart.split('/')[0];
+          }
+          // Remove everything after the first colon (port)
+          if (hostPart.contains(':')) {
+            hostPart = hostPart.split(':')[0];
+          }
+          baseUrl = 'wss://$hostPart';
+        } else if (baseUrl.startsWith('ws://')) {
+          String hostPart = baseUrl.substring(5);
+          // Remove everything after the first slash (path)
+          if (hostPart.contains('/')) {
+            hostPart = hostPart.split('/')[0];
+          }
+          // Remove everything after the first colon (port)
+          if (hostPart.contains(':')) {
+            hostPart = hostPart.split(':')[0];
+          }
+          baseUrl = 'ws://$hostPart';
+        }
+      }
+    }
     
     // Ensure it's using wss:// for secure WebSocket connection
     if (!baseUrl.startsWith('wss://') && !baseUrl.startsWith('ws://')) {
       baseUrl = 'wss://$baseUrl';
     }
 
+    print('DEBUG: Final baseUrl for WebSocket connection: $baseUrl');
+
     _initializeSocket();
   }
 
   void _initializeSocket() {
+    print('DEBUG: Initializing WebSocket connection to: $baseUrl');
+    
+    // Try a different approach with more explicit options
     socket = IO.io(
       baseUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
-          .setTimeout(5000)
+          .setTransports(['websocket']) // Force WebSocket transport only
+          .disableAutoConnect() // We'll connect manually
+          .setTimeout(20000) // Increase timeout
+          .setForceNew(true) // Force new connection
+          .setReconnection(true) // Enable reconnection
+          .setReconnectionAttempts(10) // Increase reconnection attempts
+          .setReconnectionDelay(2000) // Set reconnection delay
+          .setReconnectionDelayMax(5000) // Set max reconnection delay
+          .setRandomizationFactor(0.5) // Set randomization factor
+          .setPath('/socket.io') // Explicitly set path
+          .setQuery({
+            'EIO': '4', // Engine.IO version
+            'transport': 'websocket' // Force WebSocket transport
+          })
+          .setExtraHeaders({
+            // Add headers to help with connection
+            'Connection': 'Upgrade',
+            'Upgrade': 'websocket',
+          })
           .build(),
     );
-
-    // Event handlers
+    
+    // Add detailed connection state logging
     socket.onConnect((_) {
+      print('✅ WebSocket CONNECTED');
+      print('🆔 Socket ID: ${socket.id}');
+      print('🔗 Connected: ${socket.connected}');
+      print('🛣️ Transport: ${socket.io?.transport?.name ?? "unknown"}');
       _isConnected = true;
       _connectionController.add('connected');
       getAllTickets();
@@ -72,61 +144,110 @@ class WebSocketLottoRepository implements LottoRepository {
     });
 
     socket.onDisconnect((_) {
+      print('❌ WebSocket DISCONNECTED');
+      print('🆔 Socket ID: ${socket.id}');
+      print('🔗 Connected: ${socket.connected}');
       _isConnected = false;
       _connectionController.add('disconnected');
     });
 
     socket.onConnectError((err) {
+      print('⚠️ WebSocket CONNECTION ERROR');
+      print('🆔 Socket ID: ${socket.id}');
+      print('🔗 Connected: ${socket.connected}');
+      print('📝 Error details: $err');
       _isConnected = false;
       _connectionController.add('error: $err');
     });
-
-    socket.on('auth:success', (data) {
-      _currentUser = AppUser.fromJson(data['user']);
-      _userController.add(_currentUser!);
+    
+    // Add additional event listeners for debugging
+    socket.on('connect_timeout', (_) {
+      print('⏰ WebSocket CONNECT TIMEOUT');
     });
-
-    socket.on('tickets:list', (data) {
-      _allTickets = (data as List).map((t) => Ticket.fromJson(t)).toList();
-      _ticketsController.add(_allTickets);
+    
+    socket.on('reconnect', (attempt) {
+      print('🔁 WebSocket RECONNECT ATTEMPT: $attempt');
     });
-
-    socket.on('tickets:user-list', (data) {
-      _userTickets = (data as List).map((t) => Ticket.fromJson(t)).toList();
-      _userTicketsController.add(_userTickets);
+    
+    socket.on('reconnect_attempt', (attempt) {
+      print('🔁 WebSocket RECONNECT ATTEMPT: $attempt');
     });
-
-    socket.on('tickets:selected', (data) {
-      _selectedTickets = List<String>.from(data['selectedTickets']);
+    
+    socket.on('reconnect_failed', (_) {
+      print('❌ WebSocket RECONNECT FAILED');
     });
-
-    socket.on('tickets:deselected', (data) {
-      _selectedTickets = List<String>.from(data['selectedTickets']);
+    
+    socket.on('reconnect_error', (err) {
+      print('⚠️ WebSocket RECONNECT ERROR: $err');
     });
-
-    socket.on('purchase:success', (data) {
-      _selectedTickets.clear();
-      if (_currentUser != null) {
-        _currentUser = _currentUser!
-            .copyWith(wallet: (data['remainingWallet'] as num).toDouble());
-        _userController.add(_currentUser!);
-      }
-      getAllTickets();
-      if (_currentUser != null) getUserTickets(_currentUser!.id);
+    
+    socket.on('error', (err) {
+      print('🚨 WebSocket GENERAL ERROR: $err');
     });
   }
 
   Future<void> connect() async {
     if (!_isConnected) {
-      socket.connect();
-      await Future.any([
-        connectionStream.firstWhere((status) => status == 'connected'),
-        Future.delayed(const Duration(seconds: 8))
-      ]);
+      print('DEBUG: Attempting to connect to WebSocket');
+      print('DEBUG: Current socket connected state: ${socket.connected}');
+      print('DEBUG: Current socket ID: ${socket.id}');
+      print('DEBUG: Base URL: $baseUrl');
+      
+      try {
+        // Add a small delay before connecting
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        // Ensure socket is in a clean state
+        if (socket.connected) {
+          print('DEBUG: Socket already connected, disconnecting first');
+          socket.disconnect();
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+        
+        // Listen for connection events before connecting
+        final connectionCompleter = Completer<String>();
+        final subscription = connectionStream.listen((status) {
+          if (!connectionCompleter.isCompleted) {
+            connectionCompleter.complete(status);
+          }
+        });
+        
+        print('DEBUG: Calling socket.connect()');
+        socket.connect();
+        
+        print('DEBUG: Waiting for connection...');
+        // Wait for connection with a longer timeout and better error handling
+        String connectionStatus;
+        try {
+          connectionStatus = await connectionCompleter.future.timeout(const Duration(seconds: 25));
+          print('DEBUG: Connection status received: $connectionStatus');
+        } on TimeoutException {
+          print('DEBUG: Connection timeout after 25 seconds');
+          connectionStatus = 'timeout';
+        } catch (e) {
+          print('DEBUG: Connection error: $e');
+          connectionStatus = 'error';
+        } finally {
+          await subscription.cancel();
+        }
+        
+        print('DEBUG: Connection attempt completed with status: $connectionStatus');
+        print('DEBUG: Final socket connected state: ${socket.connected}');
+        print('DEBUG: Final socket ID: ${socket.id}');
+      } catch (e, stackTrace) {
+        print('DEBUG: Connection attempt failed with error: $e');
+        print('DEBUG: Stack trace: $stackTrace');
+        // Don't rethrow, just continue
+      }
+    } else {
+      print('DEBUG: Already connected, skipping connection attempt');
     }
   }
 
-  void disconnect() => socket.disconnect();
+  void disconnect() {
+    print('DEBUG: Disconnecting WebSocket');
+    socket.disconnect();
+  }
 
   Future<AppUser> loginMember(
       {required String username, required String password}) async {
