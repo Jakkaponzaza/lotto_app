@@ -55,12 +55,12 @@ async function initializeDatabase() {
     const connection = await getConnection();
     try {
       console.log('🗃️ Checking and creating required tables...');
-      
+
       // Check if Prize table exists
       const [prizeTables] = await connection.execute(
         "SHOW TABLES LIKE 'Prize'"
       );
-      
+
       if (prizeTables.length === 0) {
         console.log('📝 Creating Prize table with 3 columns only...');
         await connection.execute(`
@@ -78,10 +78,10 @@ async function initializeDatabase() {
         const [amountColumns] = await connection.execute(
           "SHOW COLUMNS FROM Prize LIKE 'amount'"
         );
-        
+
         if (amountColumns.length === 0) {
           console.log('🔄 Prize table exists but using old structure, recreating with 3 columns...');
-          
+
           // ลบ foreign key constraints ก่อน
           try {
             await connection.execute('ALTER TABLE Ticket DROP FOREIGN KEY Ticket_ibfk_3');
@@ -89,18 +89,18 @@ async function initializeDatabase() {
           } catch (error) {
             console.log('⚠️ Foreign key Ticket_ibfk_3 may not exist:', error.message);
           }
-          
+
           try {
             await connection.execute('ALTER TABLE Ticket DROP COLUMN prize_id');
             console.log('✅ Dropped prize_id column from Ticket');
           } catch (error) {
             console.log('⚠️ prize_id column may not exist:', error.message);
           }
-          
+
           // ลบตาราง Prize
           await connection.execute('DROP TABLE IF EXISTS Prize');
           console.log('✅ Dropped Prize table');
-          
+
           // สร้างตาราง Prize ใหม่ด้วย 3 columns เท่านั้น
           await connection.execute(`
             CREATE TABLE Prize (
@@ -114,9 +114,9 @@ async function initializeDatabase() {
           console.log('✅ Prize table recreated successfully with 3 columns only');
         }
       }
-      
+
       console.log('✅ Database initialization completed');
-      
+
     } finally {
       await connection.end();
     }
@@ -133,20 +133,20 @@ async function initializeLotteryTickets() {
       // Check if tickets already exist
       const [existingTickets] = await connection.execute('SELECT COUNT(*) as count FROM Ticket');
       const ticketCount = existingTickets[0].count;
-      
+
       if (ticketCount === 0) {
         console.log('🎫 No lottery tickets found, creating initial 120 tickets...');
-        
+
         // หา admin/owner user_id สำหรับใส่เป็น created_by
         const [adminUser] = await connection.execute(
           "SELECT user_id FROM User WHERE role IN ('owner', 'admin') ORDER BY user_id LIMIT 1"
         );
         const adminUserId = adminUser.length > 0 ? adminUser[0].user_id : 1; // fallback เป็น 1
-        
+
         const desiredCount = 120;
         const price = 80.00;
         const numbersSet = new Set();
-        
+
         // สร้างหมายเลขสุ่ม 6 หลัก (000000-999999) จำนวน 120 ชุด
         while (numbersSet.size < desiredCount) {
           const n = Math.floor(Math.random() * 1000000); // 0-999999
@@ -154,7 +154,7 @@ async function initializeLotteryTickets() {
           numbersSet.add(s);
         }
         const numbers = Array.from(numbersSet);
-        
+
         const batchSize = 50;
         let inserted = 0;
         for (let i = 0; i < numbers.length; i += batchSize) {
@@ -169,7 +169,7 @@ async function initializeLotteryTickets() {
           await connection.execute(`INSERT INTO Ticket (number, price, start_date, end_date, created_by) VALUES ${placeholders}`, values);
           inserted += batch.length;
         }
-        
+
         console.log(`✅ Created ${inserted} initial lottery tickets successfully!`);
       } else {
         console.log(`🎫 Found ${ticketCount} existing lottery tickets`);
@@ -470,7 +470,7 @@ io.on('connection', (socket) => {
 
         console.log(`📤 Sending ${allTickets.length} tickets to client ${socket.id}`);
         console.log('First 3 tickets:', allTickets.slice(0, 3));
-        
+
         socket.emit('tickets:list', allTickets);
         console.log(`✅ Tickets sent successfully to ${socket.id}`);
       } finally {
@@ -636,13 +636,13 @@ io.on('connection', (socket) => {
           status: 'sold',
           owner: userId
         });
-        
+
         // Send updated user tickets to the purchasing user
         const [updatedUserTickets] = await connection.execute(
           'SELECT ticket_id, number, price, status FROM Ticket WHERE created_by = ? ORDER BY ticket_id DESC',
           [userId]
         );
-        
+
         const userTicketsList = updatedUserTickets.map(ticket => ({
           id: ticket.ticket_id,
           number: ticket.number,
@@ -650,7 +650,7 @@ io.on('connection', (socket) => {
           status: ticket.status,
           owner_id: userId
         }));
-        
+
         socket.emit('tickets:user-list', userTicketsList);
         console.log(`🎫 Sent updated user tickets (${userTicketsList.length} tickets) to user ${userId}`);
 
@@ -737,20 +737,20 @@ io.on('connection', (socket) => {
       const connection = await getConnection();
       try {
         console.log('🎫 Force creating 120 lottery tickets...');
-        
+
         // ลบลอตเตอรี่เก่าทั้งหมดก่อน
         await connection.execute('DELETE FROM Ticket');
-        
+
         // หา admin user_id สำหรับ created_by
         const [adminUser] = await connection.execute(
           "SELECT user_id FROM User WHERE role IN ('owner', 'admin') ORDER BY user_id LIMIT 1"
         );
         const adminUserId = adminUser.length > 0 ? adminUser[0].user_id : 1;
-        
+
         const desiredCount = 120;
         const price = 80.00;
         const numbersSet = new Set();
-        
+
         // สร้างหมายเลขสุ่ม 6 หลัก (000000-999999) จำนวน 120 ชุด
         while (numbersSet.size < desiredCount) {
           const n = Math.floor(Math.random() * 1000000); // 0-999999
@@ -758,7 +758,7 @@ io.on('connection', (socket) => {
           numbersSet.add(s);
         }
         const numbers = Array.from(numbersSet);
-        
+
         const batchSize = 50;
         let inserted = 0;
         for (let i = 0; i < numbers.length; i += batchSize) {
@@ -772,22 +772,22 @@ io.on('connection', (socket) => {
           await connection.execute(`INSERT INTO Ticket (number, price, start_date, end_date, created_by) VALUES ${placeholders}`, values);
           inserted += batch.length;
         }
-        
+
         console.log(`✅ Force created ${inserted} lottery tickets successfully!`);
-        
+
         // ส่งกลับไปยัง client
         socket.emit('admin:tickets-created', {
           success: true,
           message: `สร้างลอตเตอรี่เรียบร้อย จำนวน ${inserted} ใบ`,
           ticketsCreated: inserted
         });
-        
+
         // แจ้งให้ client ทั้งหมดทราบ
         io.emit('tickets:updated', {
           message: 'มีลอตเตอรี่ใหม่แล้ว',
           ticketsCreated: inserted
         });
-        
+
       } finally {
         await connection.end();
       }
@@ -804,65 +804,65 @@ io.on('connection', (socket) => {
   // Admin draw prizes handler - Simplified version using only Prize table
   socket.on('admin:draw-prizes', async (data) => {
     console.log(`🎯 ADMIN DRAW PRIZES REQUEST: ${socket.id}`);
-    
+
     if (!session.isAuthenticated || (session.role !== 'owner' && session.role !== 'admin')) {
       socket.emit('auth:forbidden', { error: 'ไม่มีสิทธิ์เข้าถึง' });
       return;
     }
-    
+
     try {
       const { poolType, rewards } = data;
-      
+
       if (!poolType || !rewards || !Array.isArray(rewards) || rewards.length !== 5) {
         socket.emit('admin:draw-error', { error: 'ข้อมูลไม่ถูกต้อง กรุณาระบุประเภทพูลและรางวัล 5 รางวัล' });
         return;
       }
-      
+
       // ตรวจสอบว่าจำนวนเงินรางวัลถูกต้อง
       if (rewards.some(r => !r || r <= 0)) {
         socket.emit('admin:draw-error', { error: 'กรุณาระบุจำนวนเงินรางวัลให้ถูกต้อง' });
         return;
       }
-      
+
       const connection = await getConnection();
       try {
         console.log(`🎯 Drawing prizes with pool type: ${poolType}`);
-        
+
         // ดึงตั๋วที่จะใช้ในการสุ่ม
         let query;
         let params = [];
-        
+
         if (poolType === 'sold') {
           query = 'SELECT ticket_id, number FROM Ticket WHERE status = "sold" ORDER BY RAND()';
         } else {
           query = 'SELECT ticket_id, number FROM Ticket ORDER BY RAND()';
         }
-        
+
         const [ticketPool] = await connection.execute(query, params);
-        
+
         // ตรวจสอบกรณีเลือกตั๋วที่ขายแล้วแต่ไม่มีตั๋วที่ขายแล้ว
         if (poolType === 'sold' && ticketPool.length === 0) {
           console.log('⚠️ No sold tickets available for drawing');
-          socket.emit('admin:draw-error', { 
+          socket.emit('admin:draw-error', {
             error: 'ไม่มีตั๋วที่ขายแล้วในระบบ',
             code: 'NO_SOLD_TICKETS',
             suggestion: 'เปลี่ยนเป็นสุ่มจากตั๋วทั้งหมดหรือขายตั๋วก่อน'
           });
           return;
         }
-        
+
         if (ticketPool.length < 5) {
           console.log(`⚠️ Only ${ticketPool.length} tickets available, need 5 minimum`);
-          
+
           if (poolType === 'sold') {
             // สำหรับ 'sold' pool type - ไม่เพียงพอ
-            socket.emit('admin:draw-error', { 
+            socket.emit('admin:draw-error', {
               error: `มีตั๋วที่ขายแล้วเพียง ${ticketPool.length} ใบ ต้องการ 5 ใบขั้นต่ำ`,
               code: 'INSUFFICIENT_SOLD_TICKETS'
             });
           } else {
             // สำหรับ 'all' pool type - ไม่เพียงพอ
-            socket.emit('admin:draw-error', { 
+            socket.emit('admin:draw-error', {
               error: `มีตั๋วในระบบเพียง ${ticketPool.length} ใบ ต้องการ 5 ใบขั้นต่ำ`,
               code: 'INSUFFICIENT_TICKETS',
               suggestion: 'กรุณาสร้างตั๋วใหม่ก่อนออกรางวัล'
@@ -870,33 +870,33 @@ io.on('connection', (socket) => {
           }
           return;
         }
-        
+
         console.log(`🎯 Found ${ticketPool.length} tickets in pool for drawing`);
-        
+
         // สุ่มเลือก 5 ตั๋วที่ไม่ซ้ำกัน
         const shuffled = [...ticketPool].sort(() => 0.5 - Math.random());
         const winningTickets = shuffled.slice(0, 5);
-        
+
         console.log('🎯 Selected winning tickets:', winningTickets.map(t => t.number));
-        
+
         // สร้าง Prize records โดยตรงใน Prize table (ใช้เฉพาะ 3 columns)
         const prizePromises = winningTickets.map((ticket, index) => {
           const rank = index + 1;
           const amount = rewards[index];
-          
+
           return connection.execute(
             'INSERT INTO Prize (amount, `rank`) VALUES (?, ?)',
             [amount, rank]
           );
         });
-        
+
         await Promise.all(prizePromises);
-        
+
         // ดึงข้อมูลรางวัลที่เพิ่งสร้าง (ใช้เฉพาะ 3 columns)
         const [newPrizes] = await connection.execute(
           'SELECT prize_id, amount, `rank` FROM Prize ORDER BY prize_id DESC LIMIT 5'
         );
-        
+
         const drawResultData = {
           id: `draw_${Date.now()}`,
           poolType: poolType,
@@ -908,31 +908,31 @@ io.on('connection', (socket) => {
             claimed: false
           }))
         };
-        
+
         console.log('🎯 Draw completed successfully!');
-        console.log('🏆 Winning numbers:', winningTickets.map((t, i) => `${i+1}: ${t.number} (${rewards[i]} บาท)`));
-        
+        console.log('🏆 Winning numbers:', winningTickets.map((t, i) => `${i + 1}: ${t.number} (${rewards[i]} บาท)`));
+
         // ส่งผลลัพธ์กลับไปยัง admin
         socket.emit('admin:draw-success', {
           success: true,
           drawResult: drawResultData,
           message: `ออกรางวัล ${poolType === 'sold' ? 'จากตั๋วที่ขายแล้ว' : 'จากตั๋วทั้งหมด'} เรียบร้อย`
         });
-        
+
         // แจ้งไปยัง client ทั้งหมดว่ามีการออกรางวัลใหม่
         io.emit('draw:new-result', {
           drawResult: drawResultData,
           message: '🏆 มีการออกรางวัลใหม่!'
         });
-        
+
       } finally {
         await connection.end();
       }
     } catch (error) {
       console.error('Draw prizes error:', error);
-      socket.emit('admin:draw-error', { 
+      socket.emit('admin:draw-error', {
         error: 'เกิดข้อผิดพลาดในการออกรางวัล',
-        details: error.message 
+        details: error.message
       });
     }
   });
@@ -940,7 +940,7 @@ io.on('connection', (socket) => {
   // Get latest draw result handler - Simplified version
   socket.on('draw:get-latest', async () => {
     console.log(`📊 GET LATEST DRAW: ${socket.id}`);
-    
+
     try {
       const connection = await getConnection();
       try {
@@ -948,12 +948,12 @@ io.on('connection', (socket) => {
         const [prizes] = await connection.execute(
           'SELECT prize_id, amount, `rank` FROM Prize ORDER BY prize_id DESC LIMIT 5'
         );
-        
+
         if (prizes.length === 0) {
           socket.emit('draw:latest-result', { drawResult: null });
           return;
         }
-        
+
         const drawResultData = {
           id: `draw_simple`,
           poolType: 'all',
@@ -965,9 +965,9 @@ io.on('connection', (socket) => {
             claimed: false
           }))
         };
-        
+
         socket.emit('draw:latest-result', { drawResult: drawResultData });
-        
+
       } finally {
         await connection.end();
       }
@@ -1012,7 +1012,7 @@ io.on('connection', (socket) => {
         // Delete all tickets
         await connection.execute('DELETE FROM Ticket');
         console.log('✅ Cleared all ticket data');
-        
+
         // Reset AUTO_INCREMENT counter for Ticket table
         await connection.execute('ALTER TABLE Ticket AUTO_INCREMENT = 1');
         console.log('✅ Reset ticket_id counter to start from 1');
@@ -1080,16 +1080,18 @@ io.on('connection', (socket) => {
 });
 
 // No REST API endpoints - WebSocket only server
+require('dotenv').config(); // โหลดค่า .env (คุณมีแล้ว)
 
+const PORT = process.env.PORT || 3000;
 // Start server
 server.listen(PORT, () => {
   console.log(`🚀 WebSocket Lotto Server running on port ${PORT}`);
   console.log(`🌐 WebSocket Server ready for connections`);
   console.log(`📊 Server Type: Stateful WebSocket with Real-time Updates`);
-  
+
   // Initialize database and create required tables
   initializeDatabase();
-  
+
   // Initialize lottery tickets if needed
   initializeLotteryTickets();
 });
