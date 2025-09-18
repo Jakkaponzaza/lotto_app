@@ -1,4 +1,3 @@
-// Example usage of WebSocket Lotto Repository
 import 'package:flutter/material.dart';
 import '../repositories/websocket_lotto_repository.dart';
 import '../models.dart';
@@ -13,7 +12,7 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
   String connectionStatus = 'Disconnected';
   List<Ticket> tickets = [];
   AppUser? currentUser;
-  
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +46,9 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
   Future<void> _connect() async {
     try {
       await repository.connect();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connected to server')),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection failed: $e')),
@@ -54,7 +56,15 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
     }
   }
 
+  Future<void> _disconnect() async {
+    repository.disconnect();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Disconnected')),
+    );
+  }
+
   Future<void> _login() async {
+    if (connectionStatus != 'connected') return;
     try {
       await repository.loginMember(
         username: 'testuser',
@@ -71,6 +81,7 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
   }
 
   Future<void> _loadTickets() async {
+    if (connectionStatus != 'connected') return;
     try {
       await repository.getAllTickets();
     } catch (e) {
@@ -80,11 +91,25 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
     }
   }
 
+  Future<void> _selectTicket(String ticketId) async {
+    try {
+      await repository.selectTicket(ticketId);
+      await _loadTickets(); // update UI after selection
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ticket selected!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to select ticket: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('WebSocket Example'),
+        title: Text('WebSocket Lotto Example'),
         backgroundColor: Colors.blue,
       ),
       body: Padding(
@@ -100,9 +125,10 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Connection Status:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text(connectionStatus, style: TextStyle(
-                      color: connectionStatus == 'connected' ? Colors.green : Colors.red
-                    )),
+                    Text(connectionStatus,
+                        style: TextStyle(
+                          color: connectionStatus == 'connected' ? Colors.green : Colors.red,
+                        )),
                     SizedBox(height: 8),
                     Row(
                       children: [
@@ -112,7 +138,7 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
                         ),
                         SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: repository.disconnect,
+                          onPressed: _disconnect,
                           child: Text('Disconnect'),
                         ),
                       ],
@@ -155,12 +181,12 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
                     Row(
                       children: [
                         ElevatedButton(
-                          onPressed: _login,
+                          onPressed: connectionStatus == 'connected' ? _login : null,
                           child: Text('Login'),
                         ),
                         SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: _loadTickets,
+                          onPressed: connectionStatus == 'connected' ? _loadTickets : null,
                           child: Text('Load Tickets'),
                         ),
                       ],
@@ -183,12 +209,12 @@ class _WebSocketExamplePageState extends State<WebSocketExamplePage> {
                     child: ListTile(
                       title: Text('Ticket ${ticket.number}'),
                       subtitle: Text('Price: ฿${ticket.price} - Status: ${ticket.status}'),
-                      trailing: ticket.status == 'available' 
-                        ? ElevatedButton(
-                            onPressed: () => repository.selectTicket(ticket.id),
-                            child: Text('Select'),
-                          )
-                        : null,
+                      trailing: ticket.status == 'available'
+                          ? ElevatedButton(
+                              onPressed: () => _selectTicket(ticket.id),
+                              child: Text('Select'),
+                            )
+                          : null,
                     ),
                   );
                 },
