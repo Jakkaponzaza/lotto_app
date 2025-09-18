@@ -38,9 +38,17 @@ class WebSocketLottoRepository implements LottoRepository {
 
   WebSocketLottoRepository() {
     // ใช้ API_BASE_URL จาก .env หรือ Dart define, fallback default
-    baseUrl = dotenv.env['API_BASE_URL'] ??
+    String baseEnvUrl = dotenv.env['API_BASE_URL'] ??
         const String.fromEnvironment(
             'API_BASE_URL', defaultValue: 'wss://flutter-lotto-backend.onrender.com');
+
+    // Remove any trailing slash and ensure correct WebSocket URL format for Render
+    baseUrl = baseEnvUrl.replaceAll(RegExp(r'/$'), '');
+    
+    // Ensure it's using wss:// for secure WebSocket connection
+    if (!baseUrl.startsWith('wss://') && !baseUrl.startsWith('ws://')) {
+      baseUrl = 'wss://$baseUrl';
+    }
 
     _initializeSocket();
   }

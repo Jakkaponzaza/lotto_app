@@ -8,6 +8,10 @@ require('dotenv').config();
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
+
+// Get port from environment variable (Render) or default to 3000
+const PORT = process.env.PORT || 3000;
+
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -1082,8 +1086,8 @@ io.on('connection', (socket) => {
 // No REST API endpoints - WebSocket only server
 require('dotenv').config(); // โหลดค่า .env (คุณมีแล้ว)
 
-const PORT = process.env.PORT || 3000;
-// Start server
+// Use the PORT from environment for Render deployment
+// const PORT = process.env.PORT || 3000; (moved up)
 server.listen(PORT, () => {
   console.log(`🚀 WebSocket Lotto Server running on port ${PORT}`);
   console.log(`🌐 WebSocket Server ready for connections`);
