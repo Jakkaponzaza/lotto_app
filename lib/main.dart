@@ -3,7 +3,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-
 // 🏗️ INTERNAL IMPORTS - DATA MODELS
 import 'models.dart';
 
@@ -95,11 +94,11 @@ class HomeRouter extends StatelessWidget {
       if (appState.currentUser == null) {
         return const AuthView(); // 🔐 หน้าล็อกอิน/สมัครสมาชิก
       }
-      
+
       if (appState.currentUser!.isOwner || appState.currentUser!.role == UserRole.admin) {
         return const AdminPage(); // 👑 หน้าผู้ดูแลระบบ
       }
-      
+
       return const MemberPage(); // 👤 หน้าสมาชิก
     });
   }
@@ -109,19 +108,31 @@ class HomeRouter extends StatelessWidget {
 // APPLICATION INITIALIZATION
 // ======================================================
 Future<void> main() async {
-  //ENVIRONMENT CONFIGURATION - โหลดค่าตั้งค่าจาก .env
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // โหลด .env
   await dotenv.load(fileName: ".env");
 
-  // REPOSITORY SELECTION - เลือกแหล่งข้อมูล
-  // Offline Mode: InMemoryLottoRepository() - สำหรับทดสอบ
-  // WebSocket Mode: WebSocketLottoRepository() - Real-time connection (ใช้เป็นหลัก)
-  const bool useOfflineMode = false; // เปลี่ยนเป็น true เพื่อใช้ offline mode
+  // ตรวจสอบค่า API_BASE_URL
+  final apiBaseUrl = dotenv.env['API_BASE_URL'] ?? '';
+  if (apiBaseUrl.isEmpty) {
+    throw Exception('API_BASE_URL is not defined in .env');
+  }
+  print('API_BASE_URL = $apiBaseUrl');
 
-  final LottoRepository repository = useOfflineMode 
-      ? InMemoryLottoRepository() 
-      : WebSocketLottoRepository();
+  // สร้าง repository
+  final LottoRepository repository = WebSocketLottoRepository();
 
-  // APP LAUNCH - เริ่มต้นแอปพลิเคชัน
+  // 🔹 ทดสอบ WebSocket connection
+  if (repository is WebSocketLottoRepository) {
+    try {
+      await repository.connect();
+      print('Connected: ${repository.isConnected}');
+    } catch (e) {
+      print('WebSocket connection failed: $e');
+    }
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -147,13 +158,13 @@ class LottoApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(),
         scaffoldBackgroundColor: const Color(0xFF111827), // Dark background
         textTheme: GoogleFonts.kanitTextTheme(ThemeData.dark().textTheme), // Thai font
-        
+
         // APP BAR THEME
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF1F2937), // Dark card color
           foregroundColor: Colors.white,
         ),
-        
+
         // BUTTON THEME
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -162,7 +173,7 @@ class LottoApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomeRouter(), //เริ่มต้นที่ Router
+      home: const HomeRouter(), // เริ่มต้นที่ Router
     );
   }
 }

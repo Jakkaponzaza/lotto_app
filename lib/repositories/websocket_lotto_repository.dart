@@ -1,6 +1,5 @@
 // websocket_lotto_repository.dart
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models.dart';
@@ -11,16 +10,21 @@ class WebSocketLottoRepository implements LottoRepository {
   late IO.Socket socket;
   bool _isConnected = false;
 
-  final StreamController<List<Ticket>> _ticketsController = StreamController<List<Ticket>>.broadcast();
-  final StreamController<List<Ticket>> _userTicketsController = StreamController<List<Ticket>>.broadcast();
-  final StreamController<AppUser> _userController = StreamController<AppUser>.broadcast();
-  final StreamController<String> _connectionController = StreamController<String>.broadcast();
+  final StreamController<List<Ticket>> _ticketsController =
+      StreamController<List<Ticket>>.broadcast();
+  final StreamController<List<Ticket>> _userTicketsController =
+      StreamController<List<Ticket>>.broadcast();
+  final StreamController<AppUser> _userController =
+      StreamController<AppUser>.broadcast();
+  final StreamController<String> _connectionController =
+      StreamController<String>.broadcast();
 
   AppUser? _currentUser;
   List<String> _selectedTickets = [];
   List<Ticket> _allTickets = [];
   List<Ticket> _userTickets = [];
 
+  // Streams
   Stream<List<Ticket>> get ticketsStream => _ticketsController.stream;
   Stream<List<Ticket>> get userTicketsStream => _userTicketsController.stream;
   Stream<AppUser> get userStream => _userController.stream;
@@ -33,15 +37,17 @@ class WebSocketLottoRepository implements LottoRepository {
   bool get isConnected => _isConnected;
 
   WebSocketLottoRepository() {
-    baseUrl = dotenv.env['API_BASE_URL'] ?? 'wss://flutter-lotto-backend.onrender.com';
+    // ใช้ API_BASE_URL จาก .env หรือ Dart define, fallback default
+    baseUrl = dotenv.env['API_BASE_URL'] ??
+        const String.fromEnvironment(
+            'API_BASE_URL', defaultValue: 'wss://flutter-lotto-backend.onrender.com');
+
     _initializeSocket();
   }
 
   void _initializeSocket() {
-    final wsUrl = baseUrl.replaceFirst(RegExp(r'^https?'), 'wss');
-
     socket = IO.io(
-      wsUrl,
+      baseUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
@@ -49,6 +55,7 @@ class WebSocketLottoRepository implements LottoRepository {
           .build(),
     );
 
+    // Event handlers
     socket.onConnect((_) {
       _isConnected = true;
       _connectionController.add('connected');
@@ -92,7 +99,8 @@ class WebSocketLottoRepository implements LottoRepository {
     socket.on('purchase:success', (data) {
       _selectedTickets.clear();
       if (_currentUser != null) {
-        _currentUser = _currentUser!.copyWith(wallet: (data['remainingWallet'] as num).toDouble());
+        _currentUser = _currentUser!
+            .copyWith(wallet: (data['remainingWallet'] as num).toDouble());
         _userController.add(_currentUser!);
       }
       getAllTickets();
@@ -112,7 +120,8 @@ class WebSocketLottoRepository implements LottoRepository {
 
   void disconnect() => socket.disconnect();
 
-  Future<AppUser> loginMember({required String username, required String password}) async {
+  Future<AppUser> loginMember(
+      {required String username, required String password}) async {
     await connect();
     final completer = Completer<AppUser>();
 
@@ -195,32 +204,11 @@ class WebSocketLottoRepository implements LottoRepository {
   }
 
   @override
-  Future<AppUser?> purchaseTickets({required String userId, required List<String> ticketIds}) async {
+  Future<AppUser?> purchaseTickets(
+      {required String userId, required List<String> ticketIds}) async {
     await connect();
     socket.emit('purchase:tickets', {'userId': userId, 'ticketIds': ticketIds});
     return _currentUser;
-  }
-
-  @override
-  Future<DrawResult> drawPrizes({required String poolType, required List<int> rewards}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<SystemStats> getSystemStats() {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<void> resetAll() async {
-    await connect();
-    socket.emit('system:reset');
-  }
-
-  @override
-  Future<AppUser> getOwner() async {
-    if (_currentUser != null) return _currentUser!;
-    throw Exception('No authenticated user');
   }
 
   @override
@@ -236,17 +224,6 @@ class WebSocketLottoRepository implements LottoRepository {
   }
 
   @override
-  Future<DrawResult?> getLatestDraw() async => null;
-
-  @override
-  Future<AppUser> loginOrRegisterMember({required String username, int? initialWallet}) {
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<bool> claimTicket({required String userId, required String ticketId}) async => false;
-
-  @override
   void dispose() {
     disconnect();
     _ticketsController.close();
@@ -255,5 +232,39 @@ class WebSocketLottoRepository implements LottoRepository {
     _connectionController.close();
   }
 
+  // ฟังก์ชันอื่น ๆ ของ LottoRepository ที่ไม่จำเป็นตอนนี้
+  @override
+  Future<DrawResult?> getLatestDraw() async => null;
+
+  @override
+  Future<AppUser> getOwner() async {
+    if (_currentUser != null) return _currentUser!;
+    throw Exception('No authenticated user');
+  }
+
+  @override
+  Future<SystemStats> getSystemStats() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> resetAll() async {
+    await connect();
+    socket.emit('system:reset');
+  }
+
+  @override
+  Future<AppUser> loginOrRegisterMember(
+      {required String username, int? initialWallet}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> claimTicket({required String userId, required String ticketId}) async =>
+      false;
+
   Future<void> createLotteryTickets() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
