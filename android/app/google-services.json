@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "56171644534",
+    "project_id": "enhanced-oxygen-430314-h7",
+    "storage_bucket": "enhanced-oxygen-430314-h7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:56171644534:android:dfcd02b3ed34cbb976c157",
+        "android_client_info": {
+          "package_name": "com.example.flutter_ui_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8l9KKQtfnL2KgUlgcLa4PCvUotCikp0Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

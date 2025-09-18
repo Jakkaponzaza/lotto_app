@@ -1,0 +1,48 @@
+CREATE TABLE `User` (
+  `user_id` int NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone` varchar(20) NOT NULL,
+  `role` enum('owner','member','admin') NOT NULL,
+  `password` varchar(255) DEFAULT NULL,
+  `wallet` decimal(10,2) DEFAULT '0.00',
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `uniq_user_email` (`email`),
+  UNIQUE KEY `uniq_user_phone` (`phone`)
+);
+
+CREATE TABLE `Ticket` (
+  `ticket_id` int NOT NULL AUTO_INCREMENT,
+  `number` varchar(10) NOT NULL,
+  `price` decimal(8,2) NOT NULL DEFAULT '80.00',
+  `status` enum('available','sold','reserved') NOT NULL DEFAULT 'available',
+  `start_date` date NOT NULL,
+  `end_date` date NOT NULL,
+  `created_by` int NOT NULL,
+  `purchase_id` int DEFAULT NULL,
+  `prize_id` int DEFAULT NULL,
+  PRIMARY KEY (`ticket_id`),
+  UNIQUE KEY `number` (`number`),
+  FOREIGN KEY (`created_by`) REFERENCES `User` (`user_id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`purchase_id`) REFERENCES `Purchase` (`purchase_id`) ON DELETE SET NULL,
+  FOREIGN KEY (`prize_id`) REFERENCES `Prize` (`prize_id`) ON DELETE SET NULL
+);
+
+CREATE TABLE `Purchase` (
+  `purchase_id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `total_price` decimal(10,2) NOT NULL,
+  PRIMARY KEY (`purchase_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `User` (`user_id`) ON DELETE CASCADE,
+  KEY `idx_user_date` (`user_id`,`date`)
+);
+
+CREATE TABLE `Prize` (
+  `prize_id` int NOT NULL AUTO_INCREMENT,
+  `amont` decimal(10,2) NOT NULL,
+  `rank` int NOT NULL,
+  PRIMARY KEY (`prize_id`),
+  UNIQUE KEY `unique_rank` (`rank`)
+);
